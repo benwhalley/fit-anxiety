@@ -1,0 +1,44 @@
+---
+title: "FIT Randomisation"
+output: html_document
+date: '2022-03-29'
+---
+
+```{r}
+library(tidyverse)
+set.seed(123456)
+```
+
+```{r}
+# make a block of 6 to allocate from (we use 5 of these in each block)
+conditions <- c(rep("FIT", 3), rep("MI", 3))
+
+# expand table with researchers and (for checking code) a study ID
+alocs <- expand.grid(researcher=1:5, block=1:6, study=1:10) %>%  
+  group_by(study, researcher, block) %>% 
+  # experienced practitioner allocated 6 blocks, not 2
+  filter(ifelse(researcher<5 & block > 2, FALSE, TRUE)) %>% 
+  # balance conditions in-block, randomising order, 
+  # drop the last so 5th person in each block not deterministic
+  do(., tibble(tx = sample(conditions, 6)[1:5])) %>% 
+  # set an explicit order
+  mutate(order=1:5) 
+
+
+# check the numbers look as expected (e.g. set study = 1:100 above to simulate)
+alocs %>% 
+  group_by(study, block, researcher) %>% 
+  # worst case allocations per-researcher
+  summarise(pFIT=mean(tx=="FIT"), nfit=sum(tx=="FIT")) %>% 
+  group_by(study, block) %>% 
+  summarise_at(vars(pFIT), funs(min, max, mean)) %>% 
+  group_by(block) %>% 
+  summarise_at(vars(min,max,mean), mean) %>% 
+  pander()
+
+alocs %>% 
+  filter(study==1) %>% 
+  ungroup() %>% 
+  select(-study) %>% 
+  write_csv('study1_allocations.csv')
+```
